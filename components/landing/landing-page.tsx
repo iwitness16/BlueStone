@@ -610,7 +610,7 @@ export default function LandingPage() {
         </RevealSection>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
           {[
-            { icon: PhoneCall, label: "WhatsApp Support",  value: "+67 2281 4398",                href: "https://wa.me/6722814398",                     color: "bg-green-50 text-green-600 group-hover:bg-green-600" },
+            { icon: PhoneCall, label: "WhatsApp Support",  value: "+1 (672) 281-4398", href: "https://wa.me/16722814398", color: "bg-green-50 text-green-600 group-hover:bg-green-600" },
             { icon: Mail,      label: "Email Support",     value: "info@bluestonetrustbank.com",   href: "mailto:info@bluestonetrustbank.com",          color: "bg-[#e8f4fd] text-[#1a6fad] group-hover:bg-[#1a6fad]" },
             { icon: MapPin,    label: "Headquarters",      value: "New York, NY 10001, USA",           href: "#",                                             color: "bg-orange-50 text-orange-600 group-hover:bg-orange-600" },
           ].map(({ icon: Icon, label, value, href, color }) => (

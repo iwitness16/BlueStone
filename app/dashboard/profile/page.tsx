@@ -374,7 +374,7 @@ export default function ProfilePage() {
               <p className="text-sm font-semibold text-red-700 mb-3">Are you absolutely sure? Please contact support to proceed.</p>
               <div className="flex gap-3">
                 <a
-                  href="https://wa.me/6722814398"
+                  href="https://wa.me/16722814398"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"

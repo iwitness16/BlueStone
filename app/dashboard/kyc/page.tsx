@@ -89,7 +89,7 @@ export default function KYCPage() {
             <p className={`text-xs leading-relaxed ${isPending ? "text-amber-600" : "text-red-600"}`}>{isPending ? "Our compliance team is reviewing your submission. No further action needed at this time." : "Contact our support team directly to complete verification manually."}</p>
           </div>
           <div className="space-y-2.5">
-            <a href="https://wa.me/6722814398" target="_blank" rel="noopener noreferrer"
+            <a href="https://wa.me/16722814398" target="_blank" rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-all text-sm btn-press">
               Contact WhatsApp Support
             </a>

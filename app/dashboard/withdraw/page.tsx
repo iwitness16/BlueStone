@@ -15,7 +15,7 @@ const METHODS = [
   { id: "crypto", label: "Cryptocurrency", icon: "₿",  fee: "0.5%", minAmount: 30, processingTime: "10-30 min" },
 ]
 
-const WHATSAPP_NUMBER = "6722814398"
+const WHATSAPP_NUMBER = "16722814398"
 const WHATSAPP_HREF   = `https://wa.me/${WHATSAPP_NUMBER}`
 
 // ─── WhatsApp SVG ─────────────────────────────────────────────────────────────
