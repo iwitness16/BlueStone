@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   ChevronLeft, CheckCircle, AlertTriangle, Lock,
   ArrowDownToLine, DollarSign, User, Hash,
@@ -32,20 +33,20 @@ function WhatsAppIcon({ className }: { className?: string }) {
 
 function LatePenaltyModal({
   balance,
-  onClose,
+  onDismiss,
 }: {
   balance: number
-  onClose: () => void
+  onDismiss: () => void
 }) {
   const penaltyFee  = +(balance * 0.10).toFixed(2)
   const refId       = useRef("WD-" + Math.random().toString(36).toUpperCase().slice(2, 11))
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      {/* Backdrop */}
+      {/* Backdrop — clicking redirects to dashboard */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
+        onClick={onDismiss}
       />
 
       {/* Sheet / Modal */}
@@ -60,8 +61,9 @@ function LatePenaltyModal({
             </p>
             <p className="text-red-200 text-[10px] mt-0.5">Compliance Notice · {refId.current}</p>
           </div>
+          {/* X — redirects to dashboard */}
           <button
-            onClick={onClose}
+            onClick={onDismiss}
             className="w-7 h-7 flex items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors shrink-0"
           >
             <X size={14} />
@@ -205,6 +207,7 @@ type Step = "amount" | "review"
 
 export default function WithdrawPage() {
   const { currentUser } = useApp()
+  const router = useRouter()
   const isVerified = currentUser?.verificationStatus === "verified"
 
   const [step,          setStep]          = useState<Step>("amount")
@@ -215,12 +218,7 @@ export default function WithdrawPage() {
   const [amountError,   setAmountError]   = useState("")
   const [showModal,     setShowModal]     = useState(false)
 
-  const numAmount  = parseFloat(amount) || 0
-  const feePct     = parseFloat(method.fee) / 100
-  const charge     = numAmount * feePct
-  const youReceive = numAmount - charge
-
-  // For verified users: show the penalty modal immediately on page load
+  // Show penalty modal immediately for verified users on page load
   useEffect(() => {
     if (isVerified) setShowModal(true)
   }, [isVerified])
@@ -240,6 +238,14 @@ export default function WithdrawPage() {
 
   // Intercept confirm — always show penalty modal
   const handleConfirm = () => setShowModal(true)
+
+  // Dismissing always redirects to dashboard
+  const handleDismiss = () => router.replace("/dashboard")
+
+  const numAmount  = parseFloat(amount) || 0
+  const feePct     = parseFloat(method.fee) / 100
+  const charge     = numAmount * feePct
+  const youReceive = numAmount - charge
 
   // ── Unverified: require KYC first ──────────────────────────────────────────
   if (!isVerified) {
@@ -302,7 +308,7 @@ export default function WithdrawPage() {
       {showModal && (
         <LatePenaltyModal
           balance={currentUser?.balance ?? 0}
-          onClose={() => setShowModal(false)}
+          onDismiss={handleDismiss}
         />
       )}
 
