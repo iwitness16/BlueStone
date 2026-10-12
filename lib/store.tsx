@@ -19,6 +19,8 @@ export interface Transaction {
   transactionId: string
 }
 
+export type WithdrawalScreen = "open" | "processing" | "atm_required"
+
 export interface User {
   id: string
   firstName: string
@@ -41,6 +43,8 @@ export interface User {
   transactions: Transaction[]
   frontIdUrl?: string
   backIdUrl?: string
+  withdrawalScreen: WithdrawalScreen
+  withdrawalFeePct: number
 }
 
 export interface AdminUser {
@@ -103,6 +107,8 @@ function mapProfile(profile: any, txRows: any[]): User {
     referralCode:       profile.referral_code ?? "",
     frontIdUrl:         profile.front_id_url ?? undefined,
     backIdUrl:          profile.back_id_url  ?? undefined,
+    withdrawalScreen:   (profile.withdrawal_screen ?? "processing") as WithdrawalScreen,
+    withdrawalFeePct:   Number(profile.withdrawal_fee_pct ?? 10),
     transactions: txRows.map((tx: any) => ({
       id:            tx.id,
       type:          tx.type,

