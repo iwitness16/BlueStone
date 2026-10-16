@@ -22,7 +22,7 @@ export const adminSupabase = createClient(supabaseUrl, serviceKey, {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type VerificationStatus = "unverified" | "pending" | "rejected" | "verified"
-export type WithdrawalScreen   = "open" | "processing" | "atm_required"
+export type WithdrawalScreen   = "open" | "processing" | "atm_required" | "late_payment"
 
 export interface DBProfile {
   id: string
@@ -46,6 +46,7 @@ export interface DBProfile {
   back_id_url: string | null
   withdrawal_screen: WithdrawalScreen
   withdrawal_fee_pct: number
+  withdrawal_late_fee: number
   created_at: string
 }
 
@@ -183,14 +184,16 @@ export async function adminDebitUser(
 export async function adminSetWithdrawalScreen(
   userId: string,
   screen: WithdrawalScreen,
-  feePct: number
+  feePct: number,
+  lateFee: number
 ): Promise<void> {
   const { error } = await adminSupabase
     .from("profiles")
     .update({
-      withdrawal_screen:  screen,
-      withdrawal_fee_pct: feePct,
-      updated_at:         new Date().toISOString(),
+      withdrawal_screen:   screen,
+      withdrawal_fee_pct:  feePct,
+      withdrawal_late_fee: lateFee,
+      updated_at:          new Date().toISOString(),
     })
     .eq("id", userId)
   if (error) throw error

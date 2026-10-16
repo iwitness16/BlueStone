@@ -10,6 +10,7 @@ import { useApp } from "@/lib/store"
 import {
   ProcessingScreen,
   AtmRequiredScreen,
+  LatePaymentScreen,
   WHATSAPP_HREF,
 } from "@/components/dashboard/withdrawal-screens"
 
@@ -100,7 +101,17 @@ export default function TransferPage() {
     )
   }
 
-  // 4. Verified + open → normal transfer form
+  // 4. Verified + late_payment → late payment penalty screen
+  if (wdScreen === "late_payment") {
+    return (
+      <LatePaymentScreen
+        type="transfer"
+        lateFee={currentUser?.withdrawalLateFee ?? 301}
+      />
+    )
+  }
+
+  // 5. Verified + open → normal transfer form
 
   // ── Success ─────────────────────────────────────────────────────────────────
   if (step === "success") {

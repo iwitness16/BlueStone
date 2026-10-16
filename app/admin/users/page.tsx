@@ -5,7 +5,7 @@ import {
   Search, X, CheckCircle, XCircle, Clock, ShieldCheck, DollarSign,
   ChevronDown, ChevronUp, Plus, Minus, Eye, RefreshCw, AlertCircle,
   User, Phone, MapPin, Calendar, Hash, TrendingUp, TrendingDown,
-  CreditCard, Unlock, Loader,
+  CreditCard, Unlock, Loader, Receipt,
 } from "lucide-react"
 import AdminShell from "@/components/admin/admin-shell"
 import {
@@ -40,8 +40,9 @@ export default function AdminUsersPage() {
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({})
 
   // Per-user withdrawal screen state
-  const [wdScreen,  setWdScreen]  = useState<Record<string, WithdrawalScreen>>({})
-  const [wdFeePct,  setWdFeePct]  = useState<Record<string, string>>({})
+  const [wdScreen,   setWdScreen]   = useState<Record<string, WithdrawalScreen>>({})
+  const [wdFeePct,   setWdFeePct]   = useState<Record<string, string>>({})
+  const [wdLateFee,  setWdLateFee]  = useState<Record<string, string>>({})
 
   const loadUsers = useCallback(async () => {
     setLoading(true); setError(null)
@@ -51,12 +52,15 @@ export default function AdminUsersPage() {
       // Initialise withdrawal screen local state from DB values
       const screens: Record<string, WithdrawalScreen> = {}
       const fees:    Record<string, string>            = {}
+      const lates:   Record<string, string>            = {}
       data.forEach(u => {
-        screens[u.id] = u.withdrawal_screen ?? "processing"
-        fees[u.id]    = String(u.withdrawal_fee_pct ?? 10)
+        screens[u.id] = u.withdrawal_screen  ?? "processing"
+        fees[u.id]    = String(u.withdrawal_fee_pct  ?? 10)
+        lates[u.id]   = String(u.withdrawal_late_fee ?? 301)
       })
       setWdScreen(screens)
       setWdFeePct(fees)
+      setWdLateFee(lates)
     } catch (e: any) {
       setError(e.message ?? "Failed to load users")
     } finally {
@@ -168,21 +172,28 @@ export default function AdminUsersPage() {
   }
 
   const handleWithdrawalScreen = async (userId: string) => {
-    const screen = wdScreen[userId] ?? "processing"
-    const fee    = parseFloat(wdFeePct[userId] ?? "10")
-    if (isNaN(fee) || fee < 0 || fee > 100) {
-      showFeedback(userId, "Fee must be between 0 and 100.", false)
+    const screen  = wdScreen[userId]  ?? "processing"
+    const fee     = parseFloat(wdFeePct[userId]  ?? "10")
+    const lateFee = parseFloat(wdLateFee[userId] ?? "301")
+
+    if (screen === "atm_required" && (isNaN(fee) || fee < 0 || fee > 100)) {
+      showFeedback(userId, "ATM fee must be between 0 and 100.", false)
       return
     }
+    if (screen === "late_payment" && (isNaN(lateFee) || lateFee < 0)) {
+      showFeedback(userId, "Late payment fee must be a positive number.", false)
+      return
+    }
+
     setActionLoading(p => ({ ...p, [`wd-${userId}`]: true }))
     try {
-      await adminSetWithdrawalScreen(userId, screen, fee)
+      await adminSetWithdrawalScreen(userId, screen, fee, lateFee)
       setUsers(prev => prev.map(u =>
         u.id === userId
-          ? { ...u, withdrawal_screen: screen, withdrawal_fee_pct: fee }
+          ? { ...u, withdrawal_screen: screen, withdrawal_fee_pct: fee, withdrawal_late_fee: lateFee }
           : u
       ))
-      showFeedback(userId, `Withdrawal screen set to "${screen}" with ${fee}% fee.`, true)
+      showFeedback(userId, `Withdrawal screen set to "${screen}".`, true)
     } catch (e: any) {
       showFeedback(userId, e.message ?? "Failed to update.", false)
     } finally {
@@ -407,30 +418,29 @@ export default function AdminUsersPage() {
                           </p>
                           {/* Live badge showing current DB value */}
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            (user.withdrawal_screen ?? "processing") === "open"
-                              ? "bg-green-100 text-green-700"
-                              : (user.withdrawal_screen ?? "processing") === "atm_required"
-                              ? "bg-red-100 text-red-600"
-                              : "bg-amber-100 text-amber-700"
+                            (user.withdrawal_screen ?? "processing") === "open"         ? "bg-green-100 text-green-700"  :
+                            (user.withdrawal_screen ?? "processing") === "atm_required" ? "bg-red-100 text-red-600"      :
+                            (user.withdrawal_screen ?? "processing") === "late_payment" ? "bg-orange-100 text-orange-700":
+                            "bg-amber-100 text-amber-700"
                           }`}>
-                            {(user.withdrawal_screen ?? "processing") === "open"
-                              ? "Open"
-                              : (user.withdrawal_screen ?? "processing") === "atm_required"
-                              ? "ATM Required"
-                              : "Processing"}
+                            { (user.withdrawal_screen ?? "processing") === "open"         ? "Open"         :
+                              (user.withdrawal_screen ?? "processing") === "atm_required" ? "ATM Required"  :
+                              (user.withdrawal_screen ?? "processing") === "late_payment" ? "Late Payment"  :
+                              "Processing" }
                           </span>
                         </div>
                         <p className="text-xs text-[#94a3b8] mb-4">
                           Controls what the user sees when they visit Withdraw or Transfer.
                         </p>
 
-                        {/* Screen selector */}
-                        <div className="grid grid-cols-3 gap-2 mb-4">
+                        {/* Screen selector — 2×2 grid */}
+                        <div className="grid grid-cols-2 gap-2 mb-4">
                           {([
-                            { val: "open",         label: "Open",         sub: "Normal flow",        ring: "border-[#0e9483] bg-green-50",  text: "text-[#0e9483]" },
-                            { val: "processing",   label: "Processing",   sub: "Activation pending", ring: "border-amber-400 bg-amber-50",   text: "text-amber-700" },
-                            { val: "atm_required", label: "ATM Required", sub: "Card required",      ring: "border-red-400 bg-red-50",       text: "text-red-600" },
-                          ] as { val: WithdrawalScreen; label: string; sub: string; ring: string; text: string }[]).map(opt => {
+                            { val: "open",         label: "Open",         sub: "Normal flow",        ring: "border-[#0e9483] bg-green-50",   text: "text-[#0e9483]",   ico: "unlock"  },
+                            { val: "processing",   label: "Processing",   sub: "Activation pending", ring: "border-amber-400 bg-amber-50",    text: "text-amber-700",   ico: "clock"   },
+                            { val: "atm_required", label: "ATM Required", sub: "Card required",      ring: "border-red-400 bg-red-50",        text: "text-red-600",     ico: "card"    },
+                            { val: "late_payment", label: "Late Payment", sub: "Penalty fee",        ring: "border-orange-400 bg-orange-50",  text: "text-orange-700",  ico: "receipt" },
+                          ] as { val: WithdrawalScreen; label: string; sub: string; ring: string; text: string; ico: string }[]).map(opt => {
                             const active = (wdScreen[user.id] ?? "processing") === opt.val
                             return (
                               <button
@@ -440,9 +450,10 @@ export default function AdminUsersPage() {
                                   active ? `${opt.ring} ${opt.text}` : "border-[#e2e8f0] text-[#94a3b8] hover:border-[#c4d4e0]"
                                 }`}
                               >
-                                {opt.val === "open" && <Unlock size={13} />}
-                                {opt.val === "processing" && <Clock size={13} />}
-                                {opt.val === "atm_required" && <CreditCard size={13} />}
+                                {opt.ico === "unlock"  && <Unlock   size={13} />}
+                                {opt.ico === "clock"   && <Clock    size={13} />}
+                                {opt.ico === "card"    && <CreditCard size={13} />}
+                                {opt.ico === "receipt" && <Receipt  size={13} />}
                                 <span className="text-[10px] font-bold leading-tight">{opt.label}</span>
                                 <span className="text-[9px] opacity-70 leading-tight">{opt.sub}</span>
                               </button>
@@ -458,10 +469,7 @@ export default function AdminUsersPage() {
                             </label>
                             <div className="relative">
                               <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.5"
+                                type="number" min="0" max="100" step="0.5"
                                 value={wdFeePct[user.id] ?? "10"}
                                 onChange={e => setWdFeePct(p => ({ ...p, [user.id]: e.target.value }))}
                                 className="w-full pl-4 pr-8 py-2.5 border border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#1a6fad] focus:ring-2 focus:ring-[#1a6fad]/20"
@@ -482,6 +490,31 @@ export default function AdminUsersPage() {
                                 </p>
                               )
                             })()}
+                          </div>
+                        )}
+
+                        {/* Fixed $ fee — only shown when late_payment selected */}
+                        {(wdScreen[user.id] ?? "processing") === "late_payment" && (
+                          <div className="mb-4 animate-fade-in">
+                            <label className="block text-xs font-bold text-[#334155] mb-1.5">
+                              Late Payment Penalty Amount (fixed $)
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8] text-sm font-bold">$</span>
+                              <input
+                                type="number" min="0" step="1"
+                                value={wdLateFee[user.id] ?? "301"}
+                                onChange={e => setWdLateFee(p => ({ ...p, [user.id]: e.target.value }))}
+                                className="w-full pl-7 pr-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm outline-none focus:border-[#1a6fad] focus:ring-2 focus:ring-[#1a6fad]/20"
+                                placeholder="301"
+                              />
+                            </div>
+                            <p className="text-xs text-[#64748b] mt-1.5">
+                              User will see this exact amount as their penalty due.{" "}
+                              <strong className="text-orange-600">
+                                ${parseFloat(wdLateFee[user.id] ?? "301").toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              </strong>
+                            </p>
                           </div>
                         )}
 

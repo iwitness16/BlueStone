@@ -2,10 +2,11 @@
 
 /**
  * Shared withdrawal/transfer screen components.
- * Three possible states controlled by admin:
- *   processing   → account activation in progress, check back later
- *   atm_required → ATM card required, custom fee% from admin
- *   open         → normal flow proceeds (no screen shown)
+ * Four possible states controlled by admin:
+ *   processing    → account activation in progress, check back later
+ *   atm_required  → ATM card required, custom fee% from admin
+ *   late_payment  → late payment penalty fee, fixed $ amount from admin
+ *   open          → normal flow proceeds (no screen shown)
  */
 
 import Link from "next/link"
@@ -13,6 +14,7 @@ import { useRef } from "react"
 import {
   ShieldCheck, Clock, CheckCircle, CreditCard,
   BadgeAlert, MessageCircle, Package, ShieldAlert,
+  AlertTriangle, Receipt, CalendarX, BadgeDollarSign,
 } from "lucide-react"
 
 export const WHATSAPP_HREF = "https://wa.me/16722814398"
@@ -354,6 +356,220 @@ export function AtmRequiredScreen({
 
           <p className="text-center text-[10px] text-[#94a3b8] mt-4">
             BlueStone Trust Bank · Security & Compliance · 24/7 Support
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Late Payment Screen ──────────────────────────────────────────────────────
+// Shown when admin sets withdrawal_screen = 'late_payment'
+// Full page — not a modal. Shows admin-configured fixed dollar penalty amount.
+
+export function LatePaymentScreen({
+  type,
+  lateFee,
+}: {
+  type:    "withdrawal" | "transfer"
+  lateFee: number
+}) {
+  const refId = useRef(
+    (type === "withdrawal" ? "WD-" : "TRF-") +
+    Math.random().toString(36).toUpperCase().slice(2, 11)
+  )
+
+  const feeFormatted = lateFee.toLocaleString("en-US", { minimumFractionDigits: 2 })
+
+  return (
+    <div className="max-w-lg mx-auto animate-fade-in-up">
+      {/* Back link */}
+      <div className="flex items-center gap-3 mb-6">
+        <Link
+          href="/dashboard"
+          className="w-9 h-9 flex items-center justify-center bg-white border border-[#e2e8f0] rounded-xl text-[#64748b] hover:text-[#0c2d4e] transition-all"
+        >
+          ←
+        </Link>
+        <h1 className="text-xl font-bold text-[#0c2d4e] tracking-tight">
+          {type === "withdrawal" ? "Withdraw Funds" : "Fund Transfer"}
+        </h1>
+      </div>
+
+      <div className="bg-white border border-[#e2e8f0] rounded-3xl shadow-sm overflow-hidden">
+        {/* Top danger accent */}
+        <div className="bg-gradient-to-r from-[#7c2d12] to-[#b45309] h-1.5" />
+
+        <div className="p-8">
+          {/* Header notice */}
+          <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
+            <AlertTriangle size={15} className="text-amber-500 shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+                Late Payment Penalty · Action Required
+              </p>
+              <p className="text-[10px] text-amber-400 font-mono mt-0.5">{refId.current}</p>
+            </div>
+          </div>
+
+          {/* Icon */}
+          <div className="flex justify-center mb-5">
+            <div className="relative">
+              <div className="w-20 h-20 rounded-2xl bg-amber-50 border-2 border-amber-200 flex items-center justify-center">
+                <Receipt size={36} className="text-amber-500" />
+              </div>
+              <div className="absolute -top-1.5 -right-1.5 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center shadow-md">
+                <CalendarX size={14} className="text-white" />
+              </div>
+            </div>
+          </div>
+
+          {/* Title */}
+          <h2 className="text-center text-[#0c2d4e] font-bold text-xl tracking-tight mb-2">
+            Late Payment Penalty Fee
+          </h2>
+          <p className="text-center text-[#94a3b8] text-xs mb-6 max-w-sm mx-auto leading-relaxed">
+            Due to a <strong className="text-[#64748b]">delayed payment</strong> of your
+            account activation fees, a late penalty has been issued on your account.
+            This fee must be settled before your account activation is completed and{" "}
+            {type === "withdrawal" ? "withdrawals" : "transfers"} are opened.
+          </p>
+
+          {/* Fee summary card */}
+          <div className="bg-[#fffbeb] border border-amber-200 rounded-2xl overflow-hidden mb-5">
+            <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+              <BadgeDollarSign size={14} className="text-amber-600" />
+              <p className="text-xs font-bold text-amber-800 uppercase tracking-widest">
+                Penalty Fee Notice
+              </p>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-xs font-semibold text-[#334155]">Late Account Activation Fee</p>
+                  <p className="text-xs text-[#94a3b8] mt-0.5">Issued due to delayed activation payment</p>
+                </div>
+                <span className="text-2xl font-bold text-red-600 leading-none">${feeFormatted}</span>
+              </div>
+              <div className="border-t border-amber-200 pt-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#64748b]">Total Amount Due</span>
+                  <span className="font-bold text-red-600 text-base">${feeFormatted}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* What happens */}
+          <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl p-4 mb-5">
+            <p className="text-xs font-bold text-[#0c2d4e] uppercase tracking-widest mb-3">
+              What This Means
+            </p>
+            <div className="space-y-2.5">
+              {[
+                {
+                  icon: CalendarX,
+                  color: "text-red-500",
+                  bg: "bg-red-50",
+                  text: "Your account activation fees were not received within the required payment window.",
+                },
+                {
+                  icon: AlertTriangle,
+                  color: "text-amber-500",
+                  bg: "bg-amber-50",
+                  text: `A late payment penalty of $${feeFormatted} has been applied to your account per BlueStone Trust Bank policy.`,
+                },
+                {
+                  icon: CheckCircle,
+                  color: "text-[#0e9483]",
+                  bg: "bg-[#f0fdf9]",
+                  text: `Once the penalty is cleared, your account activation will be completed and full ${type === "withdrawal" ? "withdrawal" : "transfer"} access will be granted immediately.`,
+                },
+              ].map(({ icon: Icon, color, bg, text }, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${bg}`}>
+                    <Icon size={13} className={color} />
+                  </div>
+                  <p className="text-xs text-[#64748b] leading-relaxed pt-0.5">{text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Resolution steps */}
+          <div className="space-y-3 mb-6">
+            <p className="text-xs font-bold text-[#0c2d4e] uppercase tracking-widest">
+              How to Clear Your Penalty
+            </p>
+            {[
+              {
+                num:   "01",
+                icon:  MessageCircle,
+                bg:    "bg-[#e8f4fd]",
+                color: "text-[#1a6fad]",
+                title: "Contact Compliance Support",
+                desc:  "Reach our 24/7 team via WhatsApp to open a penalty resolution case.",
+              },
+              {
+                num:   "02",
+                icon:  BadgeDollarSign,
+                bg:    "bg-amber-50",
+                color: "text-amber-600",
+                title: `Pay the $${feeFormatted} Penalty Fee`,
+                desc:  "Settle the outstanding late payment penalty to clear your account hold.",
+              },
+              {
+                num:   "03",
+                icon:  CheckCircle,
+                bg:    "bg-[#f0fdf9]",
+                color: "text-[#0e9483]",
+                title: "Account Fully Activated",
+                desc:  `Full ${type === "withdrawal" ? "withdrawal" : "transfer"} access reinstated immediately upon payment confirmation.`,
+              },
+            ].map(({ num, icon: Icon, bg, color, title, desc }) => (
+              <div key={num} className="flex items-start gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
+                  <Icon size={16} className={color} />
+                </div>
+                <div className="pt-0.5">
+                  <p className="text-xs font-bold text-[#0c2d4e]">{title}</p>
+                  <p className="text-xs text-[#94a3b8] leading-relaxed">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Trust badge */}
+          <div className="bg-[#f0fdf9] border border-[#bbf7d0] rounded-xl px-4 py-3 flex items-center gap-2 mb-6">
+            <CheckCircle size={14} className="text-[#0e9483] shrink-0" />
+            <p className="text-xs text-[#065f46] leading-relaxed">
+              <strong>Your funds are fully protected.</strong> All balances are secured
+              and insured under BlueStone Trust Bank regulatory standards while this
+              hold is active.
+            </p>
+          </div>
+
+          {/* CTA */}
+          <div className="space-y-2.5">
+            <a
+              href={WHATSAPP_HREF}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2.5 bg-[#25d366] hover:bg-[#1ebe5d] text-white font-bold py-3.5 rounded-xl text-sm transition-all hover:shadow-lg btn-press"
+            >
+              <WhatsAppIcon className="w-4 h-4" />
+              Resolve Penalty on WhatsApp
+            </a>
+            <Link
+              href="/dashboard"
+              className="w-full flex items-center justify-center gap-2 border border-[#e2e8f0] text-[#64748b] hover:text-[#0c2d4e] hover:bg-[#f8fafc] font-semibold py-3 rounded-xl text-sm transition-all"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
+
+          <p className="text-center text-[10px] text-[#94a3b8] mt-4">
+            BlueStone Trust Bank · Compliance & Penalty Dept · 24/7 Support
           </p>
         </div>
       </div>
